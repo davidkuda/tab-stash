@@ -1,10 +1,11 @@
 console.log("hello world");
 
 /*****************************************************************
- * 0)  Bootstrap – gather DOM handles & wire the Clear button
+ * 0)  Bootstrap – DOM handles & button wiring
  *****************************************************************/
-const tbody = document.querySelector("#tbl tbody");
-const clearBtn = document.getElementById("clear");
+const tbody       = document.querySelector("#tbl tbody");
+const clearBtn    = document.getElementById("clear");
+const themeBtn    = document.getElementById("themeToggle");
 
 clearBtn.addEventListener("click", async () => {
   const db = await openDB();
@@ -14,23 +15,33 @@ clearBtn.addEventListener("click", async () => {
   render();
 });
 
-// Kick‑off the first paint
+themeBtn.addEventListener("click", async () => {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  const next = current === "dark" ? "light" : "dark";
+  applyTheme(next);
+  await chrome.storage.local.set({ theme: next });
+});
+
+// Load persisted theme (default = dark)
+(async () => {
+  const { theme = "dark" } = await chrome.storage.local.get("theme");
+  applyTheme(theme);
+})();
+
+// Kick‑off first table paint
 render();
 
 /*****************************************************************
- * 1)  Main renderer – pulls all rows and builds the table
+ * 1)  Table renderer – unchanged except centering via wrapper
  *****************************************************************/
 async function render() {
-  tbody.textContent = "";              // wipe previous content
+  tbody.textContent = "";
 
-  // ---- open database (read‑only) ----
   const db = await openDB();
   const store = db.transaction("pages").objectStore("pages");
-
-  // ---- fetch all records ----
   const rows = await promisify(store.getAll());
+
   if (rows.length === 0) {
-    // nothing saved yet
     const tr = document.createElement("tr");
     const td = tr.insertCell();
     td.colSpan = 5;
@@ -39,14 +50,12 @@ async function render() {
     return;
   }
 
-  // ---- newest first ----
   rows.sort((a, b) => b.lastClosed - a.lastClosed);
 
-  // ---- build table rows ----
   for (const row of rows) {
     const tr = document.createElement("tr");
 
-    // 0. favicon
+    // favicon
     const tdIcon = tr.insertCell();
     if (row.icon) {
       const img = document.createElement("img");
@@ -56,57 +65,49 @@ async function render() {
       tdIcon.append(img);
     }
 
-    // 1. domain
-    tr.insertCell().textContent = row.domain;
+    tr.insertCell().textContent = row.domain; // domain
 
-    // 2. URL (clickable)
-    const tdUrl = tr.insertCell();
+    const tdUrl = tr.insertCell();            // URL
     const a = document.createElement("a");
     a.href = row.url;
     a.target = "_blank";
     a.textContent = row.url;
     tdUrl.append(a);
 
-    // 3. count
-    tr.insertCell().textContent = row.count;
-
-    // 4. title
-    tr.insertCell().textContent = row.title;
+    tr.insertCell().textContent = row.count;  // count
+    tr.insertCell().textContent = row.title;  // title
 
     tbody.append(tr);
   }
 }
 
 /*****************************************************************
- * 2)  Tiny helpers – expanded for readability (no one‑liners)
+ * 2)  Theme helper – sets data‑theme, updates button icon
  *****************************************************************/
-function openDB() {
-  /**
-   * Opens (or creates) the `tabbundlr` database and returns a Promise
-   * with the IDBDatabase handle.  The schema is created the first
-   * time via `onupgradeneeded`.
-   */
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open("tabbundlr", 1);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      const store = db.createObjectStore("pages", { keyPath: "url" });
-      store.createIndex("domain", "domain");
-      store.createIndex("lastClosed", "lastClosed");
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+function applyTheme(mode) {
+  document.documentElement.setAttribute("data-theme", mode);
+  themeBtn.textContent = mode === "dark" ? "☀️" : "🌙";
 }
 
-function promisify(idbRequest) {
-  /**
-   * Wraps an IDBRequest in a Promise so we can `await` it.
-   */
+/*****************************************************************
+ * 3)  IndexedDB helpers (unchanged)
+ *****************************************************************/
+function openDB() {
   return new Promise((resolve, reject) => {
-    idbRequest.onsuccess = () => resolve(idbRequest.result);
-    idbRequest.onerror = () => reject(idbRequest.error);
+    const req = indexedDB.open("tabbundlr", 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      const s = db.createObjectStore("pages", { keyPath: "url" });
+      s.createIndex("domain", "domain");
+      s.createIndex("lastClosed", "lastClosed");
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+function promisify(r) {
+  return new Promise((res, rej) => {
+    r.onsuccess = () => res(r.result);
+    r.onerror   = () => rej(r.error);
   });
 }
