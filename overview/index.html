@@ -2,23 +2,22 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>TabBundlr Overview</title>
+  <title>TabBundlr</title>
   <link rel="stylesheet" href="overview.css" />
 </head>
 <body>
   <header>
     <h1>TabBundlr</h1>
-    <div class="btn-group">
-      <button id="themeToggle" title="Toggle theme">🌙</button>
-      <button id="clear">Clear list</button>
+    <div class="controls">
+      <input id="search" placeholder="Search… (e.g. domain:github)" />
+      <button id="themeToggle">🌙</button>
+      <button id="clear">Clear</button>
     </div>
   </header>
 
   <table id="tbl">
     <thead>
-      <tr>
-        <th>Date</th><th>Time</th><th>Domain</th><th>#</th><th>Page</th><th></th>
-      </tr>
+      <tr><th>Date</th><th>Time</th><th>Domain</th><th>#</th><th>Page</th><th></th></tr>
     </thead>
     <tbody></tbody>
   </table>
