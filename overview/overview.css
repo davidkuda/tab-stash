@@ -1,0 +1,54 @@
+html {
+  background-color: gray;
+}
+
+body {
+  font: 14px/1.5 system‑ui, sans‑serif;
+  margin: 0; padding: 0 1.5rem 2rem;
+  max-width: 60rem;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  background: #fff;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.viewport {
+  position: relative;
+  border: 1px solid #ccc;
+  margin-bottom: 1.2rem;
+}
+
+.row {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 0.3rem;
+}
+
+.row a {
+  flex: 1 1 auto;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row a:hover {
+  text-decoration: underline;
+}
+
+.cnt {
+  margin-left: 0.4rem;
+  color: #666;
+}
