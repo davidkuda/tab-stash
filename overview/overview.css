@@ -1,60 +1,110 @@
-html {
-  background-color: gray;
+/* --- TabBundlr Aesthetic Theme --- */
+:root {
+  --bg:              #fdfdfd;
+  --primary:         #2563eb;
+  --primary-light:   #3b82f6;
+  --border:          #e5e7eb;
+  --text:            #111827;
+  --text-light:      #4b5563;
 }
 
 body {
-  font: 14px/1.5 system‑ui, sans‑serif;
-  margin: 0; padding: 0 1.5rem 2rem;
-  max-width: 60rem;
+  font: 14px/1.5 'Inter', system-ui, sans-serif;
+  margin: 0;
+  padding: 0 1.5rem 2rem;
+  background: var(--bg);
+  color: var(--text);
+  max-width: 70rem;
 }
 
 header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
   padding: 1rem 0;
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--bg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  z-index: 10;
 }
 
 h1 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
-.viewport {
-  position: relative;
-  border: 1px solid #ccc;
-  margin-bottom: 1.2rem;
+button#clear {
+  padding: 0.4rem 1rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--primary);
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s ease;
 }
 
-.row {
-  height: 28px;
-  display: flex;
-  align-items: center;
-  padding: 0 0.3rem;
+button#clear:hover {
+  background: var(--primary-light);
 }
 
-.row a {
-  flex: 1 1 auto;
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 1rem;
+  min-width: 600px;
+}
+
+thead {
+  position: sticky;
+  top: 67px; /* header height + padding */
+  background: var(--bg);
+  z-index: 5;
+}
+
+th,
+td {
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+th {
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+tbody tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+tbody tr:hover {
+  background: #eef2ff;
+}
+
+a {
+  color: var(--primary);
   text-decoration: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.row a:hover {
+a:hover {
   text-decoration: underline;
 }
 
-.cnt {
-  margin-left: 0.4rem;
-  color: #666;
+img {
+  vertical-align: middle;
+  border-radius: 3px;
 }
 
-table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
-th, td { padding: 0.3rem 0.5rem; border: 1px solid #ddd; font-size: 13px; }
-th { background: #f7f7f7; text-align: left; }
-tr:hover { background: #f0f8ff; }
-img { vertical-align: middle; }
+tbody td:nth-child(3) {
+  max-width: 28rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
