@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>TabBundlr Overview</title>
-  <link rel="stylesheet" href="./overview.css" />
+  <link rel="stylesheet" href="overview.css" />
 </head>
 <body>
   <header>
@@ -11,16 +11,15 @@
     <button id="clear">Clear list</button>
   </header>
 
-  <!-- virtual list will be injected into this container -->
-  <main id="root"></main>
+  <table id="tbl">
+    <thead>
+      <tr>
+        <th></th><th>Domain</th><th>URL</th><th>#</th><th>Title</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
-  <!-- tiny template for one row -->
-  <template id="rowTpl">
-    <div class="row">
-      <a class="link" target="_blank"></a><span class="cnt"></span>
-    </div>
-  </template>
-
-  <script type="module" src="./overview.js"></script>
+  <script type="module" src="overview.js"></script>
 </body>
 </html>

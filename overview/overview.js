@@ -1,142 +1,112 @@
 console.log("hello world");
 
-const root   = document.getElementById("root");
-const clear  = document.getElementById("clear");
-const rowTpl = document.getElementById("rowTpl");
+/*****************************************************************
+ * 0)  Bootstrap – gather DOM handles & wire the Clear button
+ *****************************************************************/
+const tbody = document.querySelector("#tbl tbody");
+const clearBtn = document.getElementById("clear");
 
-clear.onclick = async () => {
+clearBtn.addEventListener("click", async () => {
   const db = await openDB();
-  db.transaction("pages", "readwrite").objectStore("pages").clear();
+  const tx = db.transaction("pages", "readwrite");
+  await tx.objectStore("pages").clear();
+  await tx.done;
   render();
-};
+});
 
+// Kick‑off the first paint
 render();
 
+/*****************************************************************
+ * 1)  Main renderer – pulls all rows and builds the table
+ *****************************************************************/
 async function render() {
-  //-----------------------------------------------------------
-  // 1‑A  Fetch rows (read‑only tx, native API)
-  //-----------------------------------------------------------
-  const db  = await openDB();
-  const tx  = db.transaction("pages");
-  const st  = tx.objectStore("pages");
+  tbody.textContent = "";              // wipe previous content
 
-  const rows = await req(st.getAll());
+  // ---- open database (read‑only) ----
+  const db = await openDB();
+  const store = db.transaction("pages").objectStore("pages");
 
-  await tx.done;
-
-  root.innerHTML = ""; // reset view
-  if (!rows.length) {
-    root.textContent = "No saved tabs ✨";
+  // ---- fetch all records ----
+  const rows = await promisify(store.getAll());
+  if (rows.length === 0) {
+    // nothing saved yet
+    const tr = document.createElement("tr");
+    const td = tr.insertCell();
+    td.colSpan = 5;
+    td.textContent = "No saved tabs ✨";
+    tbody.append(tr);
     return;
   }
 
-  //-----------------------------------------------------------
-  // 1‑B  Group rows by domain; decide sections
-  //-----------------------------------------------------------
-  const map = new Map();
-  rows.forEach(r => {
-    const arr = map.get(r.domain) || [];
-    arr.push(r);
-    map.set(r.domain, arr);
-  });
+  // ---- newest first ----
+  rows.sort((a, b) => b.lastClosed - a.lastClosed);
 
-  const main   = [];
-  const varia  = [];
-  map.forEach((list, dom) => (list.length >= 3 ? main : varia).push([dom, list]));
+  // ---- build table rows ----
+  for (const row of rows) {
+    const tr = document.createElement("tr");
 
-  //-----------------------------------------------------------
-  // 1‑C  Render each section using our OWN tiny VirtualList
-  //-----------------------------------------------------------
-  const makeSection = (label, data, showDom) => {
-    // Section header
-    const h2 = document.createElement("h2");
-    h2.textContent = label;
-    root.append(h2);
-
-    // Flatten + sort newest→oldest
-    const items = data.flatMap(([d, pages]) =>
-      pages.sort((a,b)=>b.lastClosed-a.lastClosed).map(p => ({...p, domain:d}))
-    );
-
-    new VirtualList({ container: root, items, showDom });
-  };
-
-  makeSection("All domains", main, false);
-  if (varia.length) makeSection("Varia", varia, true);
-}
-
-/*****************************************************************
- * 2)  Tiny dependency‑free virtual scroller
- *****************************************************************/
-class VirtualList {
-  constructor({ container, items, showDom }) {
-    this.items = items;
-    this.showDom = showDom;
-    this.rowH = 28;
-
-    // Viewport element
-    this.box = document.createElement("div");
-    this.box.className = "viewport";
-    this.box.style.height = "400px";      // fixed viewport height
-    this.box.style.overflowY = "auto";
-    container.append(this.box);
-
-    // A spacer div sets the full height so scrollbar size is right
-    this.spacer = document.createElement("div");
-    this.spacer.style.height = items.length * this.rowH + "px";
-    this.box.append(this.spacer);
-
-    // Small pool of recycled row elements
-    this.pool = [];
-    const poolSize = Math.ceil(400 / this.rowH) + 5;
-    for (let i = 0; i < poolSize; i++) {
-      const el = rowTpl.content.cloneNode(true).firstElementChild;
-      el.style.position = "absolute";
-      this.pool.push(el);
-      this.box.append(el);
+    // 0. favicon
+    const tdIcon = tr.insertCell();
+    if (row.icon) {
+      const img = document.createElement("img");
+      img.src = row.icon;
+      img.width = 16;
+      img.height = 16;
+      tdIcon.append(img);
     }
 
-    // Initial paint + scroll handler
-    this.paint();
-    this.box.addEventListener("scroll", () => this.paint());
-  }
+    // 1. domain
+    tr.insertCell().textContent = row.domain;
 
-  paint() {
-    const first = Math.floor(this.box.scrollTop / this.rowH);
-    this.pool.forEach((el, idx) => {
-      const i = first + idx;
-      if (i >= this.items.length) { el.style.display = "none"; return; }
-      const data = this.items[i];
-      el.style.display = "flex";
-      el.style.top = i * this.rowH + "px";
+    // 2. URL (clickable)
+    const tdUrl = tr.insertCell();
+    const a = document.createElement("a");
+    a.href = row.url;
+    a.target = "_blank";
+    a.textContent = row.url;
+    tdUrl.append(a);
 
-      const link = el.querySelector(".link");
-      const cnt  = el.querySelector(".cnt");
-      link.href = data.url;
-      link.textContent = `${this.showDom ? `[${data.domain}] ` : ""}${data.title}`;
-      link.onclick = () => chrome.tabs.create({ url: data.url });
-      cnt.textContent = data.count > 1 ? ` (${data.count})` : "";
-    });
+    // 3. count
+    tr.insertCell().textContent = row.count;
+
+    // 4. title
+    tr.insertCell().textContent = row.title;
+
+    tbody.append(tr);
   }
 }
 
 /*****************************************************************
- * 3)  Same tiny helpers used in background.js (duplicated here to
- *     avoid an extra import while staying self‑contained)
+ * 2)  Tiny helpers – expanded for readability (no one‑liners)
  *****************************************************************/
 function openDB() {
+  /**
+   * Opens (or creates) the `tabbundlr` database and returns a Promise
+   * with the IDBDatabase handle.  The schema is created the first
+   * time via `onupgradeneeded`.
+   */
   return new Promise((resolve, reject) => {
-    const r = indexedDB.open("tabbundlr", 1);
-    r.onupgradeneeded = () => {
-      const s = r.result.createObjectStore("pages", { keyPath: "url" });
-      s.createIndex("domain", "domain");
-      s.createIndex("lastClosed", "lastClosed");
+    const request = indexedDB.open("tabbundlr", 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      const store = db.createObjectStore("pages", { keyPath: "url" });
+      store.createIndex("domain", "domain");
+      store.createIndex("lastClosed", "lastClosed");
     };
-    r.onsuccess = () => resolve(r.result);
-    r.onerror   = () => reject(r.error);
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
   });
 }
-const req = r => new Promise((res, rej) => {
-  r.onsuccess = () => res(r.result);
-  r.onerror   = () => rej(r.error);
-});
+
+function promisify(idbRequest) {
+  /**
+   * Wraps an IDBRequest in a Promise so we can `await` it.
+   */
+  return new Promise((resolve, reject) => {
+    idbRequest.onsuccess = () => resolve(idbRequest.result);
+    idbRequest.onerror = () => reject(idbRequest.error);
+  });
+}

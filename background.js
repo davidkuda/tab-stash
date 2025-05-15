@@ -1,66 +1,60 @@
 const OVERVIEW_URL = chrome.runtime.getURL("overview/index.html");
+const DROP_QS = /^(utm_|fbclid|gclid|igshid|mc_[ce]id|ref|ref_src)$/i;
+const RETENTION_DAYS   = 365;
+const MAX_PER_DOMAIN   = 10000;
+
 
 chrome.action.onClicked.addListener(handleClick);
 
 async function handleClick() {
-
   const tabs = await chrome.tabs.query({ currentWindow: true });
   if (!tabs.length) return; // nothing to do
 
-  //-----------------------------------------------------------
-  // 2‑B  Open / create the IndexedDB database
-  //-----------------------------------------------------------
-  const db = await openDB();
   // Single read‑write transaction for the whole session
+  const db    = await openDB();
   const tx    = db.transaction("pages", "readwrite");
   const store = tx.objectStore("pages");
+  const now   = Date.now();
 
-  const now = Date.now();
-
-  //-----------------------------------------------------------
-  // 2‑C  Merge each tab into the DB  (duplicate => count++)
-  //-----------------------------------------------------------
   for (const tab of tabs) {
-    // Skip internal pages we can’t reopen later
-    if (!tab.url || tab.url.startsWith("brave:")) continue;
+    if (!tab.url || tab.url.startsWith("brave:")) {
+      continue;
+    }
 
-    const domain = getDomain(tab.url);
+    const cleanUrl = sanitizeUrl(tab.url);
+    const domain   = getDomain(cleanUrl);
 
-    // Await the request → get plain object back (see helper)
-    const existing = await req(store.get(tab.url));
+    const existing = await req(store.get(cleanUrl));
 
     if (existing) {
-      existing.count      += 1;
-      existing.lastClosed  = now;
+      existing.count       += 1;
+      existing.lastClosed   = now;
+      if (!existing.icon && tab.favIconUrl) {
+        existing.icon = tab.favIconUrl;
+      }
+
       await req(store.put(existing));
     } else {
       await req(store.add({
-        url: tab.url,
+        url:   cleanUrl,
         domain,
         title: tab.title,
+        icon:  tab.favIconUrl || "",
         count: 1,
         lastClosed: now
       }));
     }
   }
 
-  //-----------------------------------------------------------
-  // 2‑D  Retention sweep (age‑based & per‑domain cap)
-  //-----------------------------------------------------------
   // TODO: Uncomment
   // await applyRetention(store, now);
 
-  //-----------------------------------------------------------
-  // 2‑E  Commit + close all captured tabs
-  //-----------------------------------------------------------
-  await tx.done;                       // atomic write completes
-  // TODO: close tab once done
+  await tx.done;
+
+  // TODO: uncomment: close tab once done
   // await chrome.tabs.remove(tabs.map(t => t.id));
 
-  //-----------------------------------------------------------
-  // 2‑F  Show or refresh the overview tab so the user sees
-  //      what was saved *immediately*.
-  //-----------------------------------------------------------
+  // once the flow is done, open the extension.
   const [existing] = await chrome.tabs.query({ url: OVERVIEW_URL });
   if (existing) {
     await chrome.tabs.update(existing.id, { active: true });
@@ -70,9 +64,6 @@ async function handleClick() {
   }
 }
 
-/*****************************************************************
- * Helper: open (or create) the DB with native API only
- *****************************************************************/
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open("tabbundlr", 1);
@@ -86,9 +77,6 @@ function openDB() {
   });
 }
 
-/*****************************************************************
- * Helper: promisify an IDBRequest so we can await it neatly
- *****************************************************************/
 function req(r) {
   return new Promise((res, rej) => {
     r.onsuccess = () => res(r.result);
@@ -96,20 +84,24 @@ function req(r) {
   });
 }
 
-/*****************************************************************
- * Helper: domain extractor (strips leading www.)
- *****************************************************************/
+function sanitizeUrl(raw) {
+  try {
+    const u = new URL(raw);
+    const qp = u.searchParams;
+    // create a list to avoid mutating while iterating
+    const toDelete = [];
+    qp.forEach((_, k) => { if (DROP_QS.test(k)) toDelete.push(k); });
+    toDelete.forEach(k => qp.delete(k));
+    // remove trailing ? if no params left
+    if ([...qp.keys()].length === 0) u.search = "";
+    return u.toString();
+  } catch { return raw; }
+}
+
 const getDomain = u => {
   try { return new URL(u).hostname.replace(/^www\./, ""); }
   catch { return "unknown"; }
 };
-
-/*****************************************************************
- * Helper: retention   –  runs inside the same transaction
- *****************************************************************/
-const RETENTION_DAYS   = 365;   // tweak as you like or expose via UI
-const MAX_PER_DOMAIN   = 10000;
-
 
 async function applyRetention(store, now) {
   // 1) Age‑based purge
