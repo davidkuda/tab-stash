@@ -1,8 +1,3 @@
-console.log("hello world");
-
-/*****************************************************************
- * 0)  Bootstrap – DOM handles & button wiring
- *****************************************************************/
 const tbody       = document.querySelector("#tbl tbody");
 const clearBtn    = document.getElementById("clear");
 const themeBtn    = document.getElementById("themeToggle");
@@ -44,13 +39,13 @@ async function render() {
   if (rows.length === 0) {
     const tr = document.createElement("tr");
     const td = tr.insertCell();
-    td.colSpan = 5;
+    td.colSpan = 8;
     td.textContent = "No saved tabs ✨";
     tbody.append(tr);
     return;
   }
 
-    // ---- composite sort: recent ↓  then domain ↑ then count ↓ ----
+  // ---- composite sort: recent ↓  then domain ↑ then count ↓ ----
   rows.sort((a, b) => {
     // 1. newest first
     if (b.lastClosed !== a.lastClosed) {
@@ -68,7 +63,7 @@ async function render() {
   for (const row of rows) {
     const tr = document.createElement("tr");
 
-    // favicon
+        // favicon
     const tdIcon = tr.insertCell();
     if (row.icon) {
       const img = document.createElement("img");
@@ -78,17 +73,52 @@ async function render() {
       tdIcon.append(img);
     }
 
-    tr.insertCell().textContent = row.domain; // domain
+    // date (YYYY‑MM‑DD)
+    const created = new Date(row.lastClosed);
+    tr.insertCell().textContent = created.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
 
-    const tdUrl = tr.insertCell();            // URL
+    // time (24‑h HH:MM)
+    tr.insertCell().textContent = created.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+
+    // domain
+    tr.insertCell().textContent = row.domain;
+
+    // URL
+    const tdUrl = tr.insertCell();
     const a = document.createElement("a");
     a.href = row.url;
     a.target = "_blank";
     a.textContent = row.url;
     tdUrl.append(a);
 
-    tr.insertCell().textContent = row.count;  // count
-    tr.insertCell().textContent = row.title;  // title
+    // count
+    tr.insertCell().textContent = row.count;
+
+    // title
+    tr.insertCell().textContent = row.title;
+
+    // delete button
+    const tdDel = tr.insertCell();
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "✕";
+    delBtn.title = "Delete entry";
+    delBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const db = await openDB();
+      const tx = db.transaction("pages", "readwrite");
+      await tx.objectStore("pages").delete(row.url);
+      await tx.done;
+      tr.remove();
+    });
+    tdDel.append(delBtn);
 
     tbody.append(tr);
   }

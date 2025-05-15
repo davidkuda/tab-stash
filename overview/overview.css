@@ -136,7 +136,8 @@ img {
   border-radius: 3px;
 }
 
-td:nth-child(3) {
+/* URL column truncate (now 6th cell) */
+ td:nth-child(6) {
   max-width: 28rem;
   overflow: hidden;
   white-space: nowrap;
