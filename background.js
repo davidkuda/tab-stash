@@ -17,7 +17,11 @@ async function handleClick() {
   const now   = Date.now();
 
   for (const tab of tabs) {
-    if (!tab.url || tab.url.startsWith("brave:")) {
+    if (
+      !tab.url
+        || tab.url.startsWith("brave:")
+        || tab.url.startsWith("chrome-extension:")
+    ) {
       continue;
     }
 
