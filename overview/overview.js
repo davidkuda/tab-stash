@@ -50,7 +50,20 @@ async function render() {
     return;
   }
 
-  rows.sort((a, b) => b.lastClosed - a.lastClosed);
+    // ---- composite sort: recent ↓  then domain ↑ then count ↓ ----
+  rows.sort((a, b) => {
+    // 1. newest first
+    if (b.lastClosed !== a.lastClosed) {
+      return b.lastClosed - a.lastClosed;
+    }
+    // 2. alphabetic domain
+    const domCmp = a.domain.localeCompare(b.domain);
+    if (domCmp !== 0) {
+      return domCmp;
+    }
+    // 3. higher duplicate‑count first
+    return b.count - a.count;
+  });
 
   for (const row of rows) {
     const tr = document.createElement("tr");
