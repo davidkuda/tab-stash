@@ -137,9 +137,36 @@ img {
 }
 
 /* URL column truncate (now 6th cell) */
- td:nth-child(6) {
-  max-width: 28rem;
+ /* URL inside combined Page cell (now column 5) */
+ td:nth-child(5) a {
+  max-width: 24rem;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  display: inline-block;
+ }
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-light);
+  font-size: 0.78rem;
+}
+
+.meta img {
+  flex: 0 0 16px;
+  border-radius: 3px;
+ }
+
+.del {
+  cursor: pointer;
+  color: #dc2626;
+  font-weight: 600;
+  padding: 0 0.4rem;
+  font-size: 1rem;
+}
+
+.del:hover {
+  color: #ef4444;
 }

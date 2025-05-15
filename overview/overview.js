@@ -39,7 +39,7 @@ async function render() {
   if (rows.length === 0) {
     const tr = document.createElement("tr");
     const td = tr.insertCell();
-    td.colSpan = 8;
+    td.colSpan = 6;
     td.textContent = "No saved tabs ✨";
     tbody.append(tr);
     return;
@@ -63,17 +63,7 @@ async function render() {
   for (const row of rows) {
     const tr = document.createElement("tr");
 
-        // favicon
-    const tdIcon = tr.insertCell();
-    if (row.icon) {
-      const img = document.createElement("img");
-      img.src = row.icon;
-      img.width = 16;
-      img.height = 16;
-      tdIcon.append(img);
-    }
-
-    // date (YYYY‑MM‑DD)
+            // date (YYYY‑MM‑DD)
     const created = new Date(row.lastClosed);
     tr.insertCell().textContent = created.toLocaleDateString(undefined, {
       year: "numeric",
@@ -91,26 +81,45 @@ async function render() {
     // domain
     tr.insertCell().textContent = row.domain;
 
-    // URL
-    const tdUrl = tr.insertCell();
-    const a = document.createElement("a");
-    a.href = row.url;
-    a.target = "_blank";
-    a.textContent = row.url;
-    tdUrl.append(a);
-
     // count
     tr.insertCell().textContent = row.count;
 
-    // title
-    tr.insertCell().textContent = row.title;
+        // combined cell: favicon + title on first line, URL on second
+    const tdPage = tr.insertCell();
 
-    // delete button
+    const topLine = document.createElement("div");
+    topLine.className = "topline"; // flex row for favicon + title
+
+    if (row.icon) {
+      const img = document.createElement("img");
+      img.src = row.icon;
+      img.width = 16;
+      img.height = 16;
+      topLine.append(img);
+    }
+
+    const titleSpan = document.createElement("span");
+    titleSpan.textContent = row.title;
+    topLine.append(titleSpan);
+
+    const bottomLine = document.createElement("div");
+    bottomLine.className = "bottomline";
+
+    const link = document.createElement("a");
+    link.href = row.url;
+    link.target = "_blank";
+    link.textContent = row.url;
+    bottomLine.append(link);
+
+    tdPage.append(topLine, bottomLine);
+
+    // delete red X
     const tdDel = tr.insertCell();
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "✕";
-    delBtn.title = "Delete entry";
-    delBtn.addEventListener("click", async (e) => {
+    const delSpan = document.createElement("span");
+    delSpan.textContent = "✕";
+    delSpan.className = "del";
+    delSpan.title = "Delete entry";
+    delSpan.addEventListener("click", async (e) => {
       e.stopPropagation();
       const db = await openDB();
       const tx = db.transaction("pages", "readwrite");
@@ -118,7 +127,7 @@ async function render() {
       await tx.done;
       tr.remove();
     });
-    tdDel.append(delBtn);
+    tdDel.append(delSpan);(delSpan);
 
     tbody.append(tr);
   }
