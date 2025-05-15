@@ -8,32 +8,43 @@ const clearBtn = document.getElementById("clear");
 const themeBtn = document.getElementById("themeToggle");
 const searchIn = document.getElementById("search");
 
+// column prefixes for autocomplete / slash-focus
+const COL_PREFIXES = ["domain:", "url:", "title:", "date:"];
+
 // ------------------------------------------------------------
 // Event wiring
 // ------------------------------------------------------------
 clearBtn.addEventListener("click", async () => {
 	const db = await openDB();
-	const tx = db.transaction("pages", "readwrite");
-	await tx.objectStore("pages").clear();
-	await tx.done;
+	await db.transaction("pages", "readwrite").objectStore("pages").clear();
 	render();
 });
 
 themeBtn.addEventListener("click", async () => {
-	const current = document.documentElement.getAttribute("data-theme") || "dark";
-	const next = current === "dark" ? "light" : "dark";
+	const cur = document.documentElement.getAttribute("data-theme") || "dark";
+	const next = cur === "dark" ? "light" : "dark";
 	applyTheme(next);
 	await chrome.storage.local.set({ theme: next });
 });
 
 let searchDebounce;
 searchIn.addEventListener("input", () => {
+	maybeShowHint();
 	clearTimeout(searchDebounce);
 	searchDebounce = setTimeout(render, 250);
 });
 
+// slash focuses search
+window.addEventListener("keydown", (e) => {
+	if (e.key === "/" && document.activeElement !== searchIn) {
+		e.preventDefault();
+		searchIn.focus();
+		searchIn.select();
+	}
+});
+
 // ------------------------------------------------------------
-// Initialisation (theme + first paint)
+// Initialisation
 // ------------------------------------------------------------
 (async () => {
 	const { theme = "dark" } = await chrome.storage.local.get("theme");
@@ -47,17 +58,15 @@ function applyTheme(mode) {
 }
 
 // ------------------------------------------------------------
-// Main render function
+// Render
 // ------------------------------------------------------------
 async function render() {
 	tbody.textContent = "";
 
-	// fetch rows
 	const db = await openDB();
 	const store = db.transaction("pages").objectStore("pages");
 	let rows = await toPromise(store.getAll());
 
-	// filter via search
 	const query = searchIn.value.trim();
 	if (query) rows = applyFilter(rows, query);
 
@@ -71,11 +80,11 @@ async function render() {
 		return;
 	}
 
-	// 3‑level sort: recent ↓, domain ↑, count ↓
+	// sort: recent ↓ , domain ↑ , count ↓
 	rows.sort((a, b) => {
 		if (b.lastClosed !== a.lastClosed) return b.lastClosed - a.lastClosed;
-		const domCmp = a.domain.localeCompare(b.domain);
-		if (domCmp !== 0) return domCmp;
+		const domainCmp = a.domain.localeCompare(b.domain);
+		if (domainCmp !== 0) return domainCmp;
 		return b.count - a.count;
 	});
 
@@ -83,16 +92,16 @@ async function render() {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// Row builder
 // ------------------------------------------------------------
 function buildRow(rec) {
 	const tr = document.createElement("tr");
 	const d = new Date(rec.lastClosed);
 
-	// Date & time
-	tr.append(createCell(d.toISOString().slice(0, 10)));
+	// date & time
+	tr.append(cell(d.toISOString().slice(0, 10)));
 	tr.append(
-		createCell(
+		cell(
 			d.toLocaleTimeString([], {
 				hour: "2-digit",
 				minute: "2-digit",
@@ -101,11 +110,11 @@ function buildRow(rec) {
 		),
 	);
 
-	// Domain & count
-	tr.append(createCell(rec.domain));
-	tr.append(createCell(rec.count));
+	// domain / count
+	tr.append(cell(rec.domain));
+	tr.append(cell(rec.count));
 
-	// Page cell (title + meta line)
+	// page (title + url)
 	const tdPage = document.createElement("td");
 	const top = document.createElement("div");
 	top.className = "top";
@@ -115,9 +124,9 @@ function buildRow(rec) {
 		img.width = img.height = 16;
 		top.append(img);
 	}
-	const title = document.createElement("span");
-	title.textContent = rec.title;
-	top.append(title);
+	const titleSpan = document.createElement("span");
+	titleSpan.textContent = rec.title;
+	top.append(titleSpan);
 
 	const bottom = document.createElement("div");
 	bottom.className = "bot";
@@ -130,7 +139,7 @@ function buildRow(rec) {
 	tdPage.append(top, bottom);
 	tr.append(tdPage);
 
-	// delete ✕
+	// delete
 	const tdDel = document.createElement("td");
 	const del = document.createElement("span");
 	del.textContent = "✕";
@@ -139,9 +148,10 @@ function buildRow(rec) {
 	del.addEventListener("click", async (e) => {
 		e.stopPropagation();
 		const db = await openDB();
-		const tx = db.transaction("pages", "readwrite");
-		await tx.objectStore("pages").delete(rec.url);
-		await tx.done;
+		await db
+			.transaction("pages", "readwrite")
+			.objectStore("pages")
+			.delete(rec.url);
 		tr.remove();
 	});
 	tdDel.append(del);
@@ -150,10 +160,23 @@ function buildRow(rec) {
 	return tr;
 }
 
-function createCell(text) {
+function cell(txt) {
 	const td = document.createElement("td");
-	td.textContent = text;
+	td.textContent = txt;
 	return td;
+}
+
+// ------------------------------------------------------------
+// Search helpers
+// ------------------------------------------------------------
+function maybeShowHint() {
+	const val = searchIn.value;
+	const hit = COL_PREFIXES.find((p) => p.startsWith(val) && p !== val);
+	if (hit) {
+		searchIn.setAttribute("list", "colHints");
+	} else {
+		searchIn.removeAttribute("list");
+	}
 }
 
 function applyFilter(rows, raw) {
@@ -173,8 +196,8 @@ function applyFilter(rows, raw) {
 		if (field === "date")
 			return new Date(r.lastClosed).toISOString().slice(0, 10).includes(term);
 
-		const haystack = `${r.domain} ${r.url} ${r.title}`.toLowerCase();
-		return haystack.includes(term);
+		const hay = `${r.domain} ${r.url} ${r.title}`.toLowerCase();
+		return hay.includes(term);
 	});
 }
 
