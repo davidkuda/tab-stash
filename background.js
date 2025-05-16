@@ -9,7 +9,6 @@ async function handleClick() {
 	const tabs = await chrome.tabs.query({ currentWindow: true });
 	if (!tabs.length) return; // nothing to do
 
-	// Single read‑write transaction for the whole session
 	const db = await openDB();
 	const tx = db.transaction("pages", "readwrite");
 	const store = tx.objectStore("pages");
@@ -35,7 +34,6 @@ async function handleClick() {
 			if (!existing.icon && tab.favIconUrl) {
 				existing.icon = tab.favIconUrl;
 			}
-
 			await req(store.put(existing));
 		} else {
 			await req(
@@ -51,21 +49,19 @@ async function handleClick() {
 		}
 	}
 
-	// TODO: Uncomment
+	// TODO: implement (or fix) retention
 	// await applyRetention(store, now);
 
 	await tx.done;
 
-	// TODO: uncomment: close tab once done
-	// await chrome.tabs.remove(tabs.map(t => t.id));
+	let overviewTab = await chrome.tabs.create({ url: OVERVIEW_URL });
 
-	// once the flow is done, open the extension.
-	const [existing] = await chrome.tabs.query({ url: OVERVIEW_URL });
-	if (existing) {
-		await chrome.tabs.update(existing.id, { active: true });
-		await chrome.tabs.reload(existing.id);
-	} else {
-		await chrome.tabs.create({ url: OVERVIEW_URL });
+	// close all tabs
+	for (const tab of tabs) {
+		if (tab.id === overviewTab.id) {
+			continue
+		}
+	await chrome.tabs.remove(tab.id);
 	}
 }
 
@@ -115,26 +111,34 @@ const getDomain = (u) => {
 	}
 };
 
+// TODO: make this work
 async function applyRetention(store, now) {
 	// 1) Age‑based purge
 	const cutoff = now - RETENTION_DAYS * 864e5;
 	const idxAge = store.index("lastClosed");
-	for (let c = await req(idxAge.openCursor()); c; c = await req(c.continue())) {
-		if (c.value.lastClosed < cutoff) await req(c.delete());
-		else break; // cursor is lastClosed ASC —> stop when fresh enough
+
+	let cursor = await req(idxAge.openCursor());
+	while (cursor) {
+		if (cursor.value.lastClosed < cutoff) {
+			await req(cursor.delete());
+		} else {
+			break;
+		}
+		cursor = await req(cursor.continue());
 	}
 
 	// 2) Cap rows per domain (walk newest→oldest)
 	const seen = new Map();
 	const idxDom = store.index("domain");
-	for (
-		let c = await req(idxDom.openCursor(null, "prev"));
-		c;
-		c = await req(c.continue())
-	) {
-		const d = c.value.domain;
+
+	cursor = await req(idxDom.openCursor(null, "prev"));
+	while (cursor) {
+		const d = cursor.value.domain;
 		const n = seen.get(d) || 0;
-		if (n >= MAX_PER_DOMAIN) await req(c.delete());
+		if (n >= MAX_PER_DOMAIN) {
+			await req(cursor.delete());
+		}
 		seen.set(d, n + 1);
+		cursor = await req(cursor.continue());
 	}
 }
