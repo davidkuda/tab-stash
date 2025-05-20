@@ -15,10 +15,17 @@ async function handleClick() {
 	const now = Date.now();
 
 	for (const tab of tabs) {
+		// don't save:
 		if (
 			!tab.url ||
 			tab.url.startsWith("brave:") ||
-			tab.url.startsWith("chrome-extension:")
+			tab.url.startsWith("chrome:") ||
+			tab.url.startsWith("chrome-extension:") ||
+			tab.url.startsWith("file://") ||
+			tab.url.startsWith("https://teams.microsoft.com") ||
+			tab.url.startsWith("https://outlook.office.com") ||
+			tab.url.startsWith("https://chatgpt.com") ||
+			tab.url.startsWith("https://calendar.google.com")
 		) {
 			continue;
 		}
@@ -58,10 +65,18 @@ async function handleClick() {
 
 	// close all tabs
 	for (const tab of tabs) {
-		if (tab.id === overviewTab.id) {
-			continue
+		// except
+		if (
+			tab.id === overviewTab.id ||
+			tab.url.startsWith("brave://extensions") ||
+			tab.url.startsWith("chrome://extensions") ||
+			tab.url.startsWith("https://teams.microsoft.com") ||
+			tab.url.startsWith("https://outlook.office.com") ||
+			tab.url.startsWith("file://")
+		) {
+			continue;
 		}
-	await chrome.tabs.remove(tab.id);
+		await chrome.tabs.remove(tab.id);
 	}
 }
 
